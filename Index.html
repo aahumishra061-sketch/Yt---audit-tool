@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT Audit AI — Free Channel Audit</title>
+<style>
+  :root{
+    --bg:#0b0e14;
+    --card:#141824;
+    --border:#242a3a;
+    --text:#eef1f8;
+    --muted:#9aa3b8;
+    --accent:#ff4d5e;
+    --accent2:#7c5cff;
+    --good:#3ddc97;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+    background:radial-gradient(circle at 20% -10%, #1a1f30 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  .wrap{max-width:620px;margin:0 auto;}
+  header{text-align:center;margin-bottom:28px;}
+  header h1{
+    font-size:26px;margin:0 0 6px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  header p{color:var(--muted);font-size:14px;margin:0;}
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+  label{
+    display:block;font-size:13px;color:var(--muted);
+    margin:14px 0 6px;
+  }
+  label:first-of-type{margin-top:0;}
+  input,textarea{
+    width:100%;
+    background:#0f1320;
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:15px;
+    outline:none;
+  }
+  input:focus,textarea:focus{border-color:var(--accent2);}
+  textarea{resize:vertical;min-height:60px;}
+  .required{color:var(--accent);}
+  button{
+    width:100%;
+    margin-top:20px;
+    padding:16px;
+    border:none;
+    border-radius:12px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    color:#fff;font-size:16px;font-weight:600;
+    cursor:pointer;
+  }
+  button:disabled{opacity:.6;}
+  #status{
+    text-align:center;color:var(--muted);
+    font-size:13px;margin-top:10px;min-height:18px;
+  }
+  #reportBox{display:none;}
+  .score-hero{
+    text-align:center;padding:24px 0 8px;
+  }
+  .score-hero .big{
+    font-size:48px;font-weight:800;
+    color:var(--good);
+  }
+  .score-hero .label{color:var(--muted);font-size:13px;}
+  .cat-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:10px;
+    margin-top:16px;
+  }
+  .cat{
+    background:#0f1320;border:1px solid var(--border);
+    border-radius:10px;padding:10px 12px;font-size:13px;
+  }
+  .cat .name{color:var(--muted);font-size:11px;}
+  .cat .val{font-size:18px;font-weight:700;color:var(--text);}
+  .report-body{
+    white-space:pre-wrap;
+    line-height:1.65;
+    font-size:14.5px;
+    margin-top:18px;
+  }
+  .report-body h2, .report-body h3{color:var(--accent2);}
+  .footer-note{
+    text-align:center;color:var(--muted);font-size:11px;margin-top:24px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>YT Audit AI</h1>
+    <p>Apne YouTube channel ka free AI-powered audit paayein — instant.</p>
+  </header>
+
+  <div class="card" id="formCard">
+    <label>Channel URL <span class="required">*</span></label>
+    <input id="channelUrl" placeholder="https://youtube.com/@yourchannel">
+
+    <label>Niche <span class="required">*</span></label>
+    <input id="niche" placeholder="e.g. Cooking, Finance, Vlogs, GRWM">
+
+    <label>Subscriber Count</label>
+    <input id="subs" placeholder="e.g. 3,200">
+
+    <label>Average Views (last few videos)</label>
+    <input id="views" placeholder="e.g. 500-800 per video">
+
+    <label>Upload Frequency</label>
+    <input id="freq" placeholder="e.g. 3 times a week">
+
+    <label>Recent Video Titles (comma se alag karein)</label>
+    <textarea id="titles" placeholder="Video 1 title, Video 2 title, Video 3 title"></textarea>
+
+    <label>Channel Description (optional)</label>
+    <textarea id="desc" placeholder="Channel ke baare me short intro"></textarea>
+
+    <label>Aapko lagta hai weak areas kya hain? (optional)</label>
+    <textarea id="weak" placeholder="e.g. thumbnails, consistency, growth ruk gayi hai"></textarea>
+
+    <button id="submitBtn" onclick="runAudit()">🎯 Get My Free Audit</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="card" id="reportBox">
+    <div class="score-hero">
+      <div class="big" id="overallScore">--</div>
+      <div class="label">Overall Channel Score / 100</div>
+    </div>
+    <div class="cat-grid" id="catGrid"></div>
+    <div class="report-body" id="reportText"></div>
+  </div>
+
+  <div class="footer-note">Powered by Claude AI · Data aapke browser se seedha AI ko jaata hai, save nahi hota</div>
+</div>
+
+<script>
+// ⚠️ Yahan apna Cloudflare Worker URL daalna hai (Step 3 ke baad milega)
+const WORKER_URL = "PASTE_YOUR_WORKER_URL_HERE";
+
+async function runAudit(){
+  const channelUrl = document.getElementById('channelUrl').value.trim();
+  const niche = document.getElementById('niche').value.trim();
+
+  if(!channelUrl || !niche){
+    document.getElementById('status').textContent = "⚠️ Channel URL aur Niche zaroor bharein";
+    return;
+  }
+
+  const payload = {
+    channelUrl,
+    niche,
+    subs: document.getElementById('subs').value.trim(),
+    views: document.getElementById('views').value.trim(),
+    freq: document.getElementById('freq').value.trim(),
+    titles: document.getElementById('titles').value.trim(),
+    desc: document.getElementById('desc').value.trim(),
+    weak: document.getElementById('weak').value.trim()
+  };
+
+  const btn = document.getElementById('submitBtn');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  btn.textContent = "⏳ AI aapka channel analyze kar raha hai...";
+  status.textContent = "Ismein 15-20 second lag sakte hain";
+
+  try{
+    const res = await fetch(WORKER_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    if(!res.ok) throw new Error("Server error: " + res.status);
+    const data = await res.json();
+    renderReport(data.reportText);
+    status.textContent = "";
+  }catch(err){
+    status.textContent = "❌ Kuch gadbad hui: " + err.message + " (Worker URL check karein)";
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "🎯 Get My Free Audit";
+  }
+}
+
+function renderReport(text){
+  document.getElementById('reportBox').style.display = 'block';
+
+  // Try to extract overall score like "72/100" or "Overall Score: 72"
+  const scoreMatch = text.match(/(\d{1,3})\s*\/\s*100/);
+  document.getElementById('overallScore').textContent = scoreMatch ? scoreMatch[1] : "—";
+
+  document.getElementById('reportText').textContent = text;
+  document.getElementById('reportBox').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
